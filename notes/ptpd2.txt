@@ -1,0 +1,1144 @@
+PTPDv2 2.3.1
+
+usage: ptpd2 <options> < --section:key=value...>
+
+WARNING: Any command-line options take priority over options from config file!
+
+Basic options: 
+
+-c --config-file [path] 	Configuration file
+-k --check-config		Check configuration and exit
+-v --version			Print version string
+-h --help			Show this help screen
+-H --long-help			Show detailed help for all settings and behaviours
+-e --explain [section:key]	Show help for a single setting
+-O --default-config		Output default configuration (usable as config file)
+-L --ignore-lock		Skip lock file checks and locking
+-A --auto-lockfile		Use preset / port mode specific lock files
+-l --lockfile [path]		Specify path to lock file
+-p --print-lockfile		Print path to lock file and exit (useful for init scripts)
+-R --lock-directory [path]	Directory to store lock files
+-f --log-file [path]		global:log_file=[path]		Log file
+-S --statistics-file [path]	global:statistics_file=[path]	Statistics file
+-T --dot2as			Enable 802.1AS support. This has been deprecated in favour of ptpengine:profile.
+-N --noswitch			Enable no switch mode
+-K --resmgr			Enable the ptpd2 resmgr
+-F --fp ClockId:PortId		Force Master Clock Identity and ignore announce packets
+				or ignore BMCA and immediately act as a master
+-X --correction-step [n]	Correction (ns) to add to offset when stepping the clock
+-J --max-step [n]		Maximum offset in ns before stepping the clock
+-I --reqannounceinterval	Request announce interval of -1 in slave mode
+-Q --sw-timestamps-only	Don't try to enable HW timestamping and just use SW timestamps
+-q --disable-signaling		Do not handle signaling messages
+-o --servo-optimization	Enable experimental servo optimizations. HW support required.
+-x --extra-opts STRING[,STRING]  Clock update configuration using suboptions:
+					noSysClkAdj         Disable adjustments to the system clock.
+					noPTPClkAdj         Disable adjustments to the PTP clock with supported hardware.
+					noSetPTPTimeFromSys Disable initialization of the PTP clock from the system clock with supported hardware.
+                                 Configuration file for additional parameters:					<FILENAME>          The path and filename to an .ini file.
+
+Basic PTP protocol and daemon configuration options: 
+
+Command-line option		Config key(s)			Description
+------------------------------------------------------------------------------------
+-i --interface [dev]		ptpengine:interface=<dev>	Interface to use (required)
+-d --domain [n] 		ptpengine:domain=<n>		PTP domain number
+-s --slaveonly	 	 	ptpengine:preset=slaveonly	Slave only mode
+-m --masterslave 		ptpengine:preset=masterslave	Master, slave when not best GM
+-M --masteronly 		ptpengine:preset=masteronly	Master, passive when not best GM
+-y --hybrid			ptpengine:ip_mode=hybrid	Hybrid mode (multicast for sync
+								and announce, unicast for delay
+								request and response)
+-U --unicast			ptpengine:ip_mode=unicast	Unicast mode
+-g --unicast-negotiation	ptpengine:unicast_negotiation=y Enable unicast negotiation (signaling)
+-u --unicast-destinations 	ptpengine:ip_mode=unicast	Unicast destination list
+     [ip/host, ...]		ptpengine:unicast_destinations=<ip/host, ...>
+
+-E --e2e			ptpengine:delay_mechanism=E2E	End to end delay detection
+-P --p2p			ptpengine:delay_mechanism=P2P	Peer to peer delay detection
+
+-a --delay-override 		ptpengine:log_delayreq_override Override delay request interval
+                                                               announced by master
+-r --delay-interval [n] 	ptpengine:log_delayreq_interval=<n>	Delay request interval
+									(log 2)
+
+-n --noadjust			clock:no_adjust			Do not adjust the clock
+-D<DD...> --debug		global:debug_level=<level>	Debug level
+-C --foreground			global:foreground=<Y/N>		Don't run in background
+-V --verbose			global:verbose_foreground=<Y/N>	Run in foreground, log all
+								messages to standard output
+
+------------------------------------------------------------------------------------
+
+ptpd2 accepts a configuration file (.ini style) where settings are either
+grouped into sections:
+
+[section]
+; comment
+key = value
+
+or are specified as:
+
+section:key = value
+
+All settings can also be supplied as command-line parameters (after other options):
+
+--section:key=<value> --section:key <value> -section:key=<value> -section:key <value>
+
+To see the full help for all configurable options, run: ptpd2 with -H or --long-help
+To see help for a single setting only, run: ptpd2 with -e (--explain) [section:key]
+To see all default settings with descriptions, run: ptpd2 with -O (--default-config)
+
+------------------------------------------------------------------------------------
+
+PTPDv2 compatibility options for migration from versions below 2.3.0:
+
+-b [dev]			Network interface to use
+-i [n]				PTP domain number
+-G				'Master mode with NTP' (ptpengine:preset=masteronly)
+-W				'Master mode without NTP' (ptpengine:preset=masterslave) 
+-Y [n]				Delay request interval (log 2)
+-t 				Do not adjust the clock
+
+Note 1: the above parameters are deprecated and their use will issue a warning.
+Note 2: -U and -g options have been re-purposed in 2.3.1
+.
+
+
+============== Full list of ptpd2 settings ========
+
+setting: ptpengine:interface (--ptpengine:interface)
+   type: STRING
+  usage: Network interface to use - eth0, igb0 etc. (required).
+default: [none]
+
+setting: ptpengine:backup_interface (--ptpengine:backup_interface)
+   type: STRING
+  usage: Backup network interface to use - eth0, igb0 etc. When no GM available, 
+	 slave will keep alternating between primary and secondary until a GM is found.
+
+default: [none]
+
+setting: ptpengine:preset (--ptpengine:preset)
+   type: SELECT
+  usage: PTP engine preset:
+	 none	     = Defaults, no clock class restrictions
+        masteronly  = Master, passive when not best master (clock class 0..127)
+        masterslave = Full IEEE 1588 implementation:
+                      Master, slave when not best master
+	 	       (clock class 128..254)
+        slaveonly   = Slave only (clock class 255 only)
+
+options: none masteronly masterslave slaveonly 
+default: slaveonly
+
+setting: ptpengine:transport (--ptpengine:transport)
+   type: SELECT
+  usage: Transport type for PTP packets. Ethernet transport requires libpcap support.
+options: ipv4 ethernet 
+default: ipv4
+
+setting: ptpengine:profile (--ptpengine:profile)
+   type: SELECT
+  usage: PTP profile:
+      PTP = IEEE 1588 default profile
+     gPTP = 802.1AS PTP profile
+  AUTOSAR = AUTOSAR PTP profile
+options: PTP gPTP AUTOSAR 
+default: PTP
+
+setting: ptpengine:ip_mode (--ptpengine:ip_mode)
+   type: SELECT
+  usage: IP transmission mode (requires IP transport) - hybrid mode uses
+	 multicast for sync and announce, and unicast for delay request and
+	 response; unicast mode uses unicast for all transmission.
+	 When unicast mode is selected, destination IP(s) may need to be configured
+	(ptpengine:unicast_destinations).
+options: multicast unicast hybrid 
+default: multicast
+
+setting: ptpengine:unicast_negotiation (--ptpengine:unicast_negotiation)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Enable unicast negotiation support using signaling messages
+
+default: N
+
+setting: ptpengine:disable_bmca (--ptpengine:disable_bmca)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Disable Best Master Clock Algorithm for unicast masters:
+        Only effective for masteronly preset - all Announce messages
+        will be ignored and clock will transition directly into MASTER state.
+
+default: N
+
+setting: ptpengine:unicast_negotiation_listening (--ptpengine:unicast_negotiation_listening)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: When unicast negotiation enabled on a master clock, 
+	 reply to transmission requests also in LISTENING state.
+default: N
+
+setting: ptpengine:use_libpcap (--ptpengine:use_libpcap)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Use libpcap for sending and receiving traffic (automatically enabled
+	 in Ethernet mode).
+default: N
+
+setting: ptpengine:delay_mechanism (--ptpengine:delay_mechanism)
+   type: SELECT
+  usage: Delay detection mode used - use DELAY_DISABLED for syntonisation only
+	 (no full synchronisation).
+options: E2E P2P DELAY_DISABLED 
+default: E2E
+
+setting: ptpengine:domain (--ptpengine:domain)
+   type: INT (min: 0, max: 127)
+  usage: PTP domain number.
+default: 0
+
+setting: ptpengine:port_number (--ptpengine:port_number)
+   type: INT (min: 1, max: 65534)
+  usage: PTP port number (part of PTP Port Identity - not UDP port).
+        For ordinary clocks (single port), the default should be used, 
+        but when running multiple instances to simulate a boundary clock, 
+        The port number can be changed.
+default: 1
+
+setting: ptpengine:any_domain (--ptpengine:any_domain)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Usability extension: if enabled, a slave-only clock will accept
+	 masters from any domain, while preferring the configured domain,
+	 and preferring lower domain number.
+	 NOTE: this behaviour is not part of the standard.
+default: N
+
+setting: ptpengine:slave_only (--ptpengine:slave_only)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Slave only mode (sets clock class to 255, overriding value from preset).
+default: Y
+
+setting: ptpengine:inbound_latency (--ptpengine:inbound_latency)
+   type: INT
+  usage: Specify latency correction (nanoseconds) for incoming packets.
+default: 0
+
+setting: ptpengine:outbound_latency (--ptpengine:outbound_latency)
+   type: INT
+  usage: Specify latency correction (nanoseconds) for outgoing packets.
+default: 0
+
+setting: ptpengine:offset_shift (--ptpengine:offset_shift)
+   type: INT
+  usage: Apply an arbitrary shift (nanoseconds) to offset from master when
+	 in slave state. Value can be positive or negative - useful for
+	 correcting for antenna latencies, delay assymetry
+	 and IP stack latencies. This will not be visible in the offset 
+	 from master value - only in the resulting clock correction.
+default: 0
+
+setting: ptpengine:always_respect_utc_offset (--ptpengine:always_respect_utc_offset)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Compatibility option: In slave state, always respect UTC offset
+	 announced by best master, even if the the
+	 currrentUtcOffsetValid flag is announced FALSE.
+	 NOTE: this behaviour is not part of the standard.
+default: N
+
+setting: ptpengine:prefer_utc_offset_valid (--ptpengine:prefer_utc_offset_valid)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Compatibility extension to BMC algorithm: when enabled,
+	 BMC for both master and save clocks will prefer masters
+	 nannouncing currrentUtcOffsetValid as TRUE.
+	 NOTE: this behaviour is not part of the standard.
+default: N
+
+setting: ptpengine:require_utc_offset_valid (--ptpengine:require_utc_offset_valid)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Compatibility option: when enabled, ptpd2 will ignore
+	 Announce messages from masters announcing currentUtcOffsetValid
+	 as FALSE.
+	 NOTE: this behaviour is not part of the standard.
+default: N
+
+setting: ptpengine:unicast_grant_duration (--ptpengine:unicast_grant_duration)
+   type: INT (min: 30, max: 604800)
+  usage: Time (seconds) unicast messages are requested for by slaves
+	 when using unicast negotiation, and maximum time unicast message
+	 transmission is granted to slaves by masters
+
+default: 300
+
+setting: ptpengine:log_announce_interval (--ptpengine:log_announce_interval)
+   type: INT (min: -4, max: 7)
+  usage: PTP announce message interval in master state. When using unicast negotiation, for
+	 slaves this is the minimum interval requested, and for masters
+	 this is the only interval granted.
+	(expressed as log 2 i.e. -1=0.5s, 0=1s, 1=2s etc.)
+default: 1
+
+setting: ptpengine:log_announce_interval_max (--ptpengine:log_announce_interval_max)
+   type: INT (min: -1, max: 7)
+  usage: Maximum Announce message interval requested by slaves when using unicast negotiation,
+	(expressed as log 2 i.e. -1=0.5s, 0=1s, 1=2s etc.)
+default: 5
+
+setting: ptpengine:announce_receipt_timeout (--ptpengine:announce_receipt_timeout)
+   type: INT (min: 2, max: 255)
+  usage: PTP announce receipt timeout announced in master state.
+default: 6
+
+setting: ptpengine:announce_receipt_grace_period (--ptpengine:announce_receipt_grace_period)
+   type: INT (min: 0, max: 20)
+  usage: PTP announce receipt timeout grace period in slave state:
+	 when announce receipt timeout occurs, disqualify current best GM,
+	 then wait n times announce receipt timeout before resetting.
+	 Allows for a seamless GM failover when standby GMs are slow
+	 to react. When set to 0, this option is not used.
+default: 0
+
+setting: ptpengine:log_sync_interval (--ptpengine:log_sync_interval)
+   type: INT (min: -7, max: 7)
+  usage: PTP sync message interval in master state. When using unicast negotiation, for
+	 slaves this is the minimum interval requested, and for masters
+	 this is the only interval granted.
+	(expressed as log 2 i.e. -1=0.5s, 0=1s, 1=2s etc.)
+default: 0
+
+setting: ptpengine:log_sync_interval_max (--ptpengine:log_sync_interval_max)
+   type: INT (min: -1, max: 7)
+  usage: Maximum Sync message interval requested by slaves when using unicast negotiation,
+	(expressed as log 2 i.e. -1=0.5s, 0=1s, 1=2s etc.)
+default: 5
+
+setting: ptpengine:log_delayreq_override (--ptpengine:log_delayreq_override)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Override the Delay Request interval announced by best master.
+default: N
+
+setting: ptpengine:log_delayreq_auto (--ptpengine:log_delayreq_auto)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Automatically override the Delay Request interval
+         if the announced value is 127 (0X7F), such as in
+         unicast messages (unless using unicast negotiation)
+default: Y
+
+setting: ptpengine:log_delayreq_interval_initial (--ptpengine:log_delayreq_interval_initial)
+   type: INT (min: -7, max: 7)
+  usage: Delay request interval used before receiving first delay response
+	(expressed as log 2 i.e. -1=0.5s, 0=1s, 1=2s etc.)
+default: 0
+
+setting: ptpengine:log_delayreq_interval (--ptpengine:log_delayreq_interval)
+   type: INT (min: -7, max: 7)
+  usage: Minimum delay request interval announced when in master state,
+	 in slave state overrides the master interval,
+	 required in hybrid mode. When using unicast negotiation, for
+	 slaves this is the minimum interval requested, and for masters
+	 this is the minimum interval granted.
+	(expressed as log 2 i.e. -1=0.5s, 0=1s, 1=2s etc.)
+default: 0
+
+setting: ptpengine:log_delayreq_interval_max (--ptpengine:log_delayreq_interval_max)
+   type: INT (min: -1, max: 7)
+  usage: Maximum Delay Response interval requested by slaves when using unicast negotiation,
+	(expressed as log 2 i.e. -1=0.5s, 0=1s, 1=2s etc.)
+default: 5
+
+setting: ptpengine:log_peer_delayreq_interval (--ptpengine:log_peer_delayreq_interval)
+   type: INT (min: -7, max: 7)
+  usage: Minimum peer delay request message interval in peer to peer delay mode.
+        When using unicast negotiation, this is the minimum interval requested, 
+	 and the only interval granted.
+	(expressed as log 2 i.e. -1=0.5s, 0=1s, 1=2s etc.)
+default: 1
+
+setting: ptpengine:log_peer_delayreq_interval_max (--ptpengine:log_peer_delayreq_interval_max)
+   type: INT (min: -1, max: 7)
+  usage: Maximum Peer Delay Response interval requested by slaves when using unicast negotiation,
+	(expressed as log 2 i.e. -1=0.5s, 0=1s, 1=2s etc.)
+default: 5
+
+setting: ptpengine:foreignrecord_capacity (--ptpengine:foreignrecord_capacity)
+   type: INT (min: 5, max: 10)
+  usage: Foreign master record size (Maximum number of foreign masters).
+default: 5
+
+setting: ptpengine:ptp_allan_variance (--ptpengine:ptp_allan_variance)
+   type: INT (min: 0, max: 65535)
+  usage: Specify Allan variance announced in master state.
+default: 65535
+
+setting: ptpengine:ptp_clock_accuracy (--ptpengine:ptp_clock_accuracy)
+   type: SELECT
+  usage: Clock accuracy range announced in master state.
+options: ACC_25NS ACC_100NS ACC_250NS ACC_1US ACC_2.5US ACC_10US ACC_25US ACC_100US ACC_250US ACC_1MS ACC_2.5MS ACC_10MS ACC_25MS ACC_100MS ACC_250MS ACC_1S ACC_10S ACC_10SPLUS ACC_UNKNOWN 
+default: ACC_UNKNOWN
+
+setting: ptpengine:utc_offset (--ptpengine:utc_offset)
+   type: INT
+  usage: Underlying time source UTC offset announced in master state.
+default: 0
+
+setting: ptpengine:utc_offset_valid (--ptpengine:utc_offset_valid)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Underlying time source UTC offset validity announced in master state.
+default: N
+
+setting: ptpengine:time_traceable (--ptpengine:time_traceable)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Underlying time source time traceability announced in master state.
+default: N
+
+setting: ptpengine:frequency_traceable (--ptpengine:frequency_traceable)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Underlying time source frequency traceability announced in master state.
+default: N
+
+setting: ptpengine:ptp_timescale (--ptpengine:ptp_timescale)
+   type: SELECT
+  usage: Time scale announced in master state (with ARB, UTC properties
+	 are ignored by slaves). When clock class is set to 13 (application
+	 specific), this value is ignored and ARB is used.
+options: PTP ARB 
+default: PTP
+
+setting: ptpengine:ptp_timesource (--ptpengine:ptp_timesource)
+   type: SELECT
+  usage: Time source announced in master state.
+options: ATOMIC_CLOCK GPS TERRESTRIAL_RADIO PTP NTP HAND_SET OTHER INTERNAL_OSCILLATOR 
+default: INTERNAL_OSCILLATOR
+
+setting: ptpengine:clock_class (--ptpengine:clock_class)
+   type: INT (only value of 255 allowed)
+  usage: Clock class - announced in master state. Always 255 for slave-only.
+	 Minimum, maximum and default values are controlled by presets.
+	 If set to 13 (application specific time source), announced 
+	 time scale is always set to ARB. This setting controls the
+	 states a PTP port can be in. If below 128, port will only
+	 be in MASTER or PASSIVE states (master only). If above 127,
+	 port will be in MASTER or SLAVE states.
+default: 255
+
+setting: ptpengine:priority1 (--ptpengine:priority1)
+   type: INT (min: 0, max: 248)
+  usage: Priority 1 announced in master state,used for Best Master
+	 Clock selection.
+default: 128
+
+setting: ptpengine:priority2 (--ptpengine:priority2)
+   type: INT (min: 0, max: 248)
+  usage: Priority 2 announced in master state, used for Best Master
+	 Clock selection.
+default: 128
+
+setting: ptpengine:max_listen (--ptpengine:max_listen)
+   type: INT (min: 1)
+  usage: Number of consecutive resets to LISTENING before full network reset
+
+default: 5
+
+setting: ptpengine:unicast_destinations (--ptpengine:unicast_destinations)
+   type: STRING
+  usage: Specify unicast slave addresses for unicast master operation, or unicast
+	 master addresses for slave operation. Format is similar to an ACL: comma,
+        tab or space-separated IPv4 unicast addresses, one or more. For a slave,
+        when unicast negotiation is used, setting this is mandatory.
+default: [none]
+
+setting: ptpengine:unicast_domains (--ptpengine:unicast_domains)
+   type: STRING
+  usage: Specify PTP domain number for each configured unicast destination (ptpengine:unicast_destinations).
+	 This is only used by slave-only clocks using unicast destinations to allow for each master
+        to be in a separate domain, such as with Telecom Profile. The number of entries should match the number
+        of unicast destinations, otherwise unconfigured domains or domains set to 0 are set to domain configured in
+        ptpengine:domain. The format is a comma, tab or space-separated list of 8-bit unsigned integers (0 .. 255)
+default: [none]
+
+setting: ptpengine:unicast_local_preference (--ptpengine:unicast_local_preference)
+   type: STRING
+  usage: Specify a local preference for each configured unicast destination (ptpengine:unicast_destinations).
+	 This is only used by slave-only clocks using unicast destinations to allow for each master's
+        BMC selection to be influenced by the slave, such as with Telecom Profile. The number of entries should match the number
+        of unicast destinations, otherwise unconfigured preference is set to 0 (highest).
+        The format is a comma, tab or space-separated list of 8-bit unsigned integers (0 .. 255)
+default: [none]
+
+setting: ptpengine:unicast_peer_destination (--ptpengine:unicast_peer_destination)
+   type: STRING
+  usage: Specify peer unicast adress for P2P unicast. Mandatory when
+	 running unicast mode and P2P delay mode.
+default: [none]
+
+setting: ptpengine:management_enable (--ptpengine:management_enable)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Enable handling of PTP management messages.
+default: Y
+
+setting: ptpengine:management_set_enable (--ptpengine:management_set_enable)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Accept SET and COMMAND management messages.
+default: N
+
+setting: ptpengine:igmp_refresh (--ptpengine:igmp_refresh)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Send explicit IGMP joins between engine resets and periodically
+	 in master state.
+default: Y
+
+setting: ptpengine:master_igmp_refresh_interval (--ptpengine:master_igmp_refresh_interval)
+   type: INT (min: 0, max: 255)
+  usage: Periodic IGMP join interval (seconds) in master state when running
+	 IPv4 multicast: when set below 10 or when ptpengine:igmp_refresh
+	 is disabled, this setting has no effect.
+default: 60
+
+setting: ptpengine:multicast_ttl (--ptpengine:multicast_ttl)
+   type: INT (min: 1, max: 64)
+  usage: Multicast time to live for multicast PTP packets (ignored and set to 1
+	 for peer to peer messages).
+default: 64
+
+setting: ptpengine:ip_dscp (--ptpengine:ip_dscp)
+   type: INT (min: 0, max: 63)
+  usage: DiffServ CodepPoint for packet prioritisation (decimal). When set to zero, 
+	 this option is not used. Use 46 for Expedited Forwarding (0x2e).
+default: 0
+
+setting: ptpengine:idle_timeout (--ptpengine:idle_timeout)
+   type: INT (min: 10, max: 3600)
+  usage: PTP idle timeout: if PTPd is in SLAVE state and there have been no clock
+	 updates for this amout of time, PTPd releases clock control.
+
+default: 120
+
+setting: ptpengine:panic_mode (--ptpengine:panic_mode)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Enable panic mode: when offset from master is above 1 second, stop updating
+	 the clock for a period of time and then step the clock if offset remains
+	 above 1 second.
+default: N
+
+setting: ptpengine:panic_mode_duration (--ptpengine:panic_mode_duration)
+   type: INT (min: 1, max: 60)
+  usage: Duration (minutes) of the panic mode period (no clock updates) when offset
+	 above 1 second detected.
+default: 2
+
+setting: ptpengine:panic_mode_release_clock (--ptpengine:panic_mode_release_clock)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: When entering panic mode, release clock control while panic mode lasts
+	 if ntpengine:* configured, this will fail over to NTP,
+	 if not set, PTP will hold clock control during panic mode.
+default: N
+
+setting: ptpengine:panic_mode_exit_threshold (--ptpengine:panic_mode_exit_threshold)
+   type: INT (min: 0, max: 999999999)
+  usage: Do not exit panic mode until offset drops below this value (nanoseconds).
+	 0 = not used.
+default: 0
+
+setting: ptpengine:pid_as_clock_identity (--ptpengine:pid_as_clock_identity)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Use PTPd's process ID as the middle part of the PTP clock ID - useful for running multiple instances.
+default: N
+
+setting: ptpengine:ntp_failover (--ptpengine:ntp_failover)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Fail over to NTP when PTP time sync not available - requires
+	 ntpengine:enabled, but does not require the rest of NTP configuration:
+	 will warn instead of failing over if cannot control ntpd.
+default: N
+
+setting: ptpengine:ntp_failover_timeout (--ptpengine:ntp_failover_timeout)
+   type: INT (min: 0, max: 1800)
+  usage: NTP failover timeout in seconds: time between PTP slave going into
+	 LISTENING state, and releasing clock control. 0 = fail over immediately.
+default: 120
+
+setting: ptpengine:prefer_ntp (--ptpengine:prefer_ntp)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Prefer NTP time synchronisation. Only use PTP when NTP not available,
+	 could be used when NTP runs with a local GPS receiver or another reference
+default: N
+
+setting: ptpengine:panic_mode_ntp (--ptpengine:panic_mode_ntp)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Legacy option from 2.3.0: same as ptpengine:panic_mode_release_clock
+default: N
+
+setting: ptpengine:sigusr2_clears_counters (--ptpengine:sigusr2_clears_counters)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Clear counters after dumping all counter values on SIGUSR2.
+default: N
+
+setting: ptpengine:timing_acl_permit (--ptpengine:timing_acl_permit)
+   type: STRING
+  usage: Permit access control list for timing packets. Format is a series of 
+        comma, space or tab separated  network prefixes: IPv4 addresses or full CIDR notation a.b.c.d/x,
+        where a.b.c.d is the subnet and x is the decimal mask, or a.b.c.d/v.x.y.z where a.b.c.d is the
+        subnet and v.x.y.z is the 4-octet mask. The match is performed on the source IP address of the
+        incoming messages. IP access lists are only supported when using the IP transport.
+default: [none]
+
+setting: ptpengine:timing_acl_deny (--ptpengine:timing_acl_deny)
+   type: STRING
+  usage: Deny access control list for timing packets. Format is a series of 
+        comma, space or tab separated  network prefixes: IPv4 addresses or full CIDR notation a.b.c.d/x,
+        where a.b.c.d is the subnet and x is the decimal mask, or a.b.c.d/v.x.y.z where a.b.c.d is the
+        subnet and v.x.y.z is the 4-octet mask. The match is performed on the source IP address of the
+        incoming messages. IP access lists are only supported when using the IP transport.
+default: [none]
+
+setting: ptpengine:management_acl_permit (--ptpengine:management_acl_permit)
+   type: STRING
+  usage: Permit access control list for management messages. Format is a series of 
+	 comma, space or tab separated  network prefixes: IPv4 addresses or full CIDR notation a.b.c.d/x,
+	 where a.b.c.d is the subnet and x is the decimal mask, or a.b.c.d/v.x.y.z where a.b.c.d is the
+        subnet and v.x.y.z is the 4-octet mask. The match is performed on the source IP address of the
+        incoming messages. IP access lists are only supported when using the IP transport.
+default: [none]
+
+setting: ptpengine:management_acl_deny (--ptpengine:management_acl_deny)
+   type: STRING
+  usage: Deny access control list for management messages. Format is a series of 
+        comma, space or tab separated  network prefixes: IPv4 addresses or full CIDR notation a.b.c.d/x,
+        where a.b.c.d is the subnet and x is the decimal mask, or a.b.c.d/v.x.y.z where a.b.c.d is the
+        subnet and v.x.y.z is the 4-octet mask. The match is performed on the source IP address of the
+        incoming messages. IP access lists are only supported when using the IP transport.
+default: [none]
+
+setting: ptpengine:timing_acl_order (--ptpengine:timing_acl_order)
+   type: SELECT
+  usage: Order in which permit and deny access lists are evaluated for timing
+	 packets, the evaluation process is the same as for Apache httpd.
+options: permit-deny deny-permit 
+default: deny-permit
+
+setting: ptpengine:management_acl_order (--ptpengine:management_acl_order)
+   type: SELECT
+  usage: Order in which permit and deny access lists are evaluated for management
+	 messages, the evaluation process is the same as for Apache httpd.
+options: permit-deny deny-permit 
+default: deny-permit
+
+setting: dot2as:as_capable (--dot2as:as_capable)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Set known interoperatiblity of 802.1AS rather than determining it with the protocol.
+default: N
+
+setting: dot2as:sync_receipt_timeout (--dot2as:sync_receipt_timeout)
+   type: INT (min: 0, max: 2147483647)
+  usage: Number of sync intervals to wait without receiving a sync message before timing out. Set 0 to disable.
+default: 3
+
+setting: autosar:no_signaling_msg (--autosar:no_signaling_msg)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Do not send 802.1AS signaling messages.
+default: N
+
+setting: autosar:message_compliance (--autosar:message_compliance)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Set false to use AUTOSAR TLVs.
+default: Y
+
+setting: autosar:global_time_propagation_delay (--autosar:global_time_propagation_delay)
+   type: FLOAT (min: 0.000000, max: 4.000000)
+
+  usage: Set propagation delay, in seconds.
+default: 0.000000
+
+setting: autosar:global_time_tx_pdelay_req_period (--autosar:global_time_tx_pdelay_req_period)
+   type: FLOAT (min: 0.000000, max: 4.000000)
+
+  usage: Set TX PdelayReqPeriod, in seconds. A value of 0.0 will disable pdelay measurement.
+default: 0.000000
+
+setting: autosar:global_time_tx_crc_secured (--autosar:global_time_tx_crc_secured)
+   type: SELECT
+  usage: Set CRC supported:
+        CRC_NOT_SUPPORTED = CRC is not supported
+        CRC_SUPPORTED     = Enabled CRC calculations in the Master
+options: CRC_NOT_SUPPORTED CRC_SUPPORTED 
+default: CRC_NOT_SUPPORTED
+
+setting: autosar:crc_time_flags_tx_secured (--autosar:crc_time_flags_tx_secured)
+   type: INT (min: 0, max: 63)
+  usage: Set fields to use in Follow_Up CRC calculation. Set as bitmask.
+                 CRCMessageLength 0x01
+                  CRCDomainNumber 0x02
+               CRCCorrectionField 0x04
+            CRCSourcePortIdentity 0x08
+              CRCSequenceIdentity 0x10
+        CRCPreciseOriginTimestamp 0x20
+                         Reserved 0x40
+                         Reserved 0x80
+default: 32
+
+setting: autosar:rx_crc_validated (--autosar:rx_crc_validated)
+   type: SELECT
+  usage: Set how CRC validation should be handled.
+              CRC_IGNORED = Accept all SubTLVs
+        CRC_NOT_VALIDATED = Accept unsecured SubTLVs
+             CRC_OPTIONAL = Accept unsecured SubTLVs and secured SubTLVs with a correct CRC
+            CRC_VALIDATED = Accept secured SubTLVs with a correct CRC
+options: CRC_IGNORED CRC_NOT_VALIDATED CRC_OPTIONAL CRC_VALIDATED 
+default: CRC_OPTIONAL
+
+setting: autosar:subtlv_time (--autosar:subtlv_time)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Set to TX/RX a SubTLV:Time Secured
+default: N
+
+setting: autosar:subtlv_status (--autosar:subtlv_status)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Set to TX/RX a SubTLV:Status Secured
+default: N
+
+setting: autosar:subtlv_user_data (--autosar:subtlv_user_data)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Set to TX/RX a SubTLV:UserData Secured
+default: N
+
+setting: autosar:subtlv_user_data_length (--autosar:subtlv_user_data_length)
+   type: INT (min: 0, max: 3)
+  usage: Length of user data in SubTLV:UserData in bytes. 0 to send no bytes.
+default: 0
+
+setting: autosar:subtlv_user_data_bytes (--autosar:subtlv_user_data_bytes)
+   type: BYTE ARRAY [3]
+  usage: Set data to be sent with SubTLV:UserData
+default: 00 00 00
+
+setting: autosar:global_time_followup_data_id_list (--autosar:global_time_followup_data_id_list)
+   type: BYTE ARRAY [16]
+  usage: Set the DataIDs used in CRC calculation
+default: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+setting: autosar:sync_to_gateway (--autosar:sync_to_gateway)
+   type: INT (min: 0, max: 1)
+  usage: Set SYNC_TO_GATEWAY bit in timeBaseStatus
+default: 0
+
+setting: avnu:no_verify_source_port_identity (--avnu:no_verify_source_port_identity)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Do not verify incoming packet's sourcePortIdentity.
+default: N
+
+setting: clock:no_adjust (--clock:no_adjust)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Do not adjust the clock
+default: N
+
+setting: clock:no_adjust_system (--clock:no_adjust_system)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Do not adjust the system clock.
+default: N
+
+setting: clock:no_adjust_ptp (--clock:no_adjust_ptp)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Do not adjust the PTP clock (hardware support).
+default: N
+
+setting: clock:no_set_ptp_from_system (--clock:no_set_ptp_from_system)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Do not set the PTP clock with the system clock's current time.	This occurs on initialization and clock stepping.
+default: N
+
+setting: clock:no_reset (--clock:no_reset)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Do not step the clock - only slew
+default: N
+
+setting: clock:step_startup_force (--clock:step_startup_force)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Force clock step on first sync after startup regardless of offset and clock:no_reset
+default: N
+
+setting: clock:step_startup (--clock:step_startup)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Step clock on startup if offset >= 1 second, ignoring
+        panic mode and clock:no_reset
+default: N
+
+setting: clock:drift_handling (--clock:drift_handling)
+   type: SELECT
+  usage: Observed drift handling method between servo restarts:
+	 reset: set to zero (not recommended)
+	 preserve: use kernel value,
+	 file: load/save to drift file on startup/shutdown, use kernel
+	 value inbetween. To specify drift file, use the clock:drift_file setting.
+options: reset preserve file 
+default: preserve
+
+setting: clock:drift_file (--clock:drift_file)
+   type: STRING
+  usage: Specify drift file
+default: /etc/ptpd2_kernelclock.drift
+
+setting: clock:leap_second_pause_period (--clock:leap_second_pause_period)
+   type: INT (min: 5, max: 600)
+  usage: Time (seconds) before and after midnight that clock updates should pe suspended for
+	 during a leap second event. The total duration of the pause is twice
+        the configured duration
+default: 5
+
+setting: clock:leap_second_notice_period (--clock:leap_second_notice_period)
+   type: INT (min: 3600, max: 86400)
+  usage: Time (seconds) before midnight that PTPd starts announcing the leap second
+	 if it's running as master
+default: 43200
+
+setting: clock:leap_seconds_file (--clock:leap_seconds_file)
+   type: STRING
+  usage: Specify leap second file location - up to date version can be downloaded from 
+        http://www.ietf.org/timezones/data/leap-seconds.list
+default: [none]
+
+setting: clock:leap_second_handling (--clock:leap_second_handling)
+   type: SELECT
+  usage: Behaviour during a leap second event:
+	 accept: inform the OS kernel of the event
+	 ignore: do nothing - ends up with a 1-second offset which is then slewed
+	 step: similar to ignore, but steps the clock immediately after the leap second event
+        smear: do not inform kernel, gradually introduce the leap second before the event
+               by modifying clock offset (see clock:leap_second_smear_period)
+options: accept ignore step smear 
+default: accept
+
+setting: clock:leap_second_smear_period (--clock:leap_second_smear_period)
+   type: INT (min: 3600, max: 86400)
+  usage: Time period (Seconds) over which the leap second is introduced before the event.
+	 Example: when set to 86400 (24 hours), an extra 11.5 microseconds is added every second
+default: 86400
+
+setting: servo:delayfilter_stiffness (--servo:delayfilter_stiffness)
+   type: INT
+  usage: One-way delay filter stiffness.
+default: 6
+
+setting: servo:kp (--servo:kp)
+   type: FLOAT(min: 0.000001)
+  usage: Clock servo PI controller proportional component gain (kP).
+default: 1.000000
+
+setting: servo:ki (--servo:ki)
+   type: FLOAT(min: 0.000001)
+  usage: Clock servo PI controller integral component gain (kI).
+default: 0.100000
+
+setting: servo:dt_method (--servo:dt_method)
+   type: SELECT
+  usage: How servo update interval (delta t) is calculated:
+	 none:     servo not corrected for update interval (dt always 1),
+	 constant: constant value (target servo update rate - sync interval for PTP,
+	 measured: servo measures how often it's updated and uses this interval.
+options: none constant measured 
+default: constant
+
+setting: servo:dt_max (--servo:dt_max)
+   type: FLOAT (min: 1.500000, max: 100.000000)
+
+  usage: Maximum servo update interval (delta t) when using measured servo update interval
+	 (servo:dt_method = measured), specified as sync interval multiplier.
+default: 5.000000
+
+setting: servo:max_delay (--servo:max_delay)
+   type: INT (min: 0, max: 999999999)
+  usage: Do accept master to slave delay (delayMS - from Sync message) or slave to master delay
+	 (delaySM - from Delay messages) if greater than this value (nanoseconds). 0 = not used.
+default: 0
+
+setting: servo:max_delay_max_rejected (--servo:max_delay_max_rejected)
+   type: INT (min: 0)
+  usage: Maximum number of consecutive delay measurements exceeding maxDelay threshold,
+	 before slave is reset.
+default: 0
+
+setting: ptpengine:sync_sequence_checking (--ptpengine:sync_sequence_checking)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: When enabled, Sync messages will only be accepted if sequence ID is increasing.        This is limited to 50 dropped messages.
+
+default: N
+
+setting: ptpengine:sync_sequence_checking_max_err (--ptpengine:sync_sequence_checking_max_err)
+   type: INT
+  usage: Set allowable number of consecutive sync sequence errors before accepting new sync.
+        Valid only when ptpengine:sync_sequence_checking is enabled.
+default: 50
+
+setting: ptpengine:clock_update_timeout (--ptpengine:clock_update_timeout)
+   type: INT (min: 0, max: 3600)
+  usage: If set to non-zero, timeout in seconds, after which the slave resets if no clock updates made. 
+
+default: 0
+
+setting: servo:max_offset (--servo:max_offset)
+   type: INT (min: 0, max: 999999999)
+  usage: Do not reset the clock if offset from master is greater
+        than this value (nanoseconds). 0 = not used.
+default: 0
+
+setting: global:use_syslog (--global:use_syslog)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Send log messages to syslog. Disabling this
+        sends all messages to stdout (or speficied log file).
+default: N
+
+setting: global:lock_file (--global:lock_file)
+   type: STRING
+  usage: Lock file location
+default: [none]
+
+setting: global:auto_lockfile (--global:auto_lockfile)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: 	 Use mode specific and interface specific lock file
+	 (overrides global:lock_file).
+default: N
+
+setting: global:lock_directory (--global:lock_directory)
+   type: STRING
+  usage: Lock file directory: used with automatic mode-specific lock files,
+	 also used when no lock file is specified. When lock file
+	 is specified, it's expected to be an absolute path.
+default: /dev/shmem
+
+setting: global:ignore_lock (--global:ignore_lock)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Skip lock file checking and locking.
+default: N
+
+setting: global:quality_file (--global:quality_file)
+   type: STRING
+  usage: File used to record data about sync packets. Enables recording when set.
+default: [none]
+
+setting: global:quality_file_max_size (--global:quality_file_max_size)
+   type: INT (min: 0)
+  usage: Maximum sync packet record file size (in kB) - file will be truncated
+	if size exceeds the limit. 0 - no limit.
+default: 0
+
+setting: global:quality_file_max_files (--global:quality_file_max_files)
+   type: INT (min: 0, max: 100)
+  usage: Enable log rotation of the sync packet record file up to n files.
+	 0 - do not rotate.
+
+default: 0
+
+setting: global:quality_file_truncate (--global:quality_file_truncate)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Truncate the sync packet record file every time it is (re) opened:
+	 startup and SIGHUP.
+default: N
+
+setting: global:status_file (--global:status_file)
+   type: STRING
+  usage: File used to log ptpd2 status information.
+default: /dev/shmem/ptpd2.status
+
+setting: global:log_status (--global:log_status)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Enable / disable writing status information to file.
+default: N
+
+setting: global:status_update_interval (--global:status_update_interval)
+   type: INT (min: 1, max: 30)
+  usage: Status file update interval in seconds.
+default: 1
+
+setting: global:log_file (--global:log_file)
+   type: STRING
+  usage: Specify log file path (event log). Setting this enables logging to file.
+default: [none]
+
+setting: global:log_file_max_size (--global:log_file_max_size)
+   type: INT (min: 0)
+  usage: Maximum log file size (in kB) - log file will be truncated if size exceeds
+	 the limit. 0 - no limit.
+default: 0
+
+setting: global:log_file_max_files (--global:log_file_max_files)
+   type: INT (min: 0, max: 100)
+  usage: Enable log rotation of the sync packet record file up to n files.
+	 0 - do not rotate.
+
+default: 0
+
+setting: global:log_file_truncate (--global:log_file_truncate)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Truncate the log file every time it is (re) opened: startup and SIGHUP.
+default: N
+
+setting: global:log_level (--global:log_level)
+   type: SELECT
+  usage: Specify log level (only messages at this priority or higer will be logged).
+	 The minimal level is LOG_ERR. LOG_ALL enables debug output if compiled with
+	 RUNTIME_DEBUG.
+options: LOG_ERR LOG_WARNING LOG_NOTICE LOG_INFO LOG_ALL 
+default: LOG_ALL
+
+setting: global:statistics_file (--global:statistics_file)
+   type: STRING
+  usage: Specify statistics log file path. Setting this enables logging of 
+	 statistics, but can be overriden with global:log_statistics.
+default: [none]
+
+setting: global:statistics_log_interval (--global:statistics_log_interval)
+   type: INT (min: 0)
+  usage: Log timing statistics every n seconds for Sync and Delay messages
+	 (0 - log all).
+default: 0
+
+setting: global:statistics_file_max_size (--global:statistics_file_max_size)
+   type: INT (min: 0)
+  usage: Maximum statistics log file size (in kB) - log file will be truncated
+	 if size exceeds the limit. 0 - no limit.
+default: 0
+
+setting: global:statistics_file_max_files (--global:statistics_file_max_files)
+   type: INT (min: 0, max: 100)
+  usage: Enable log rotation of the statistics file up to n files. 0 - do not rotate.
+default: 0
+
+setting: global:statistics_file_truncate (--global:statistics_file_truncate)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Truncate the statistics file every time it is (re) opened: startup and SIGHUP.
+default: N
+
+setting: global:dump_packets (--global:dump_packets)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Dump the contents of every PTP packet
+default: N
+
+setting: global:verbose_foreground (--global:verbose_foreground)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Run in foreground with statistics and all messages logged to stdout.
+	 Overrides log file and statistics file settings and disables syslog.
+
+default: N
+
+setting: global:foreground (--global:foreground)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Run in foreground - ignored when global:verbose_foreground is set
+default: N
+
+setting: global:log_statistics (--global:log_statistics)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Log timing statistics for every PTP packet received
+
+default: N
+
+setting: global:statistics_timestamp_format (--global:statistics_timestamp_format)
+   type: SELECT
+  usage: Timestamp format used when logging timing statistics
+        (when global:log_statistics is enabled):
+        datetime - formatttted date and time: YYYY-MM-DD hh:mm:ss.uuuuuu
+        unix - Unix timestamp with nanoseconds: s.ns
+        both - Formatted date and time, followed by unix timestamp
+               (adds one extra field  to the log)
+
+options: datetime unix both 
+default: datetime
+
+setting: global:statistics_update_interval (--global:statistics_update_interval)
+   type: INT (min: 1, max: 60)
+  usage: Clock synchronisation statistics update interval in seconds
+
+default: 0
+
+setting: global:periodic_updates (--global:periodic_updates)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Log a status update every time statistics are updated (global:statistics_update_interval).
+        The updates are logged even when ptpd is configured without statistics support
+default: N
+
+setting: global:timingdomain_election_delay (--global:timingdomain_election_delay)
+   type: INT (min: 0, max: 3600)
+  usage:  Delay (seconds) before releasing a time service (NTP or PTP)        and electing a new one to control a clock. 0 = elect immediately
+
+default: 15
+
+setting: ntpengine:enabled (--ntpengine:enabled)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Enable NTPd integration
+default: N
+
+setting: ntpengine:control_enabled (--ntpengine:control_enabled)
+   type: BOOLEAN (value must start with t/T/y/Y/1/f/F/n/N/0)
+  usage: Enable control over local NTPd daemon
+default: N
+
+setting: ntpengine:check_interval (--ntpengine:check_interval)
+   type: INT (min: 5, max: 600)
+  usage: NTP control check interval in seconds
+
+default: 15
+
+setting: ntpengine:key_id (--ntpengine:key_id)
+   type: INT (min: 0, max: 65535)
+  usage: NTP key number - must be configured as a trusted control key in ntp.conf,
+	  and be non-zero for the ntpengine:control_enabled setting to take effect.
+
+default: 0
+
+setting: ntpengine:key (--ntpengine:key)
+   type: STRING
+  usage: NTP key (plain text, max. 20 characters) - must match the key configured in
+	 ntpd's keys file, and must be non-zero for the ntpengine:control_enabled
+	 setting to take effect.
+
+default: [none]
+
+
+==================AVAILABLE PTP ENGINE PRESETS===============
+
+        preset name: none
+         slave only: FALSE
+allow clock control: TRUE
+default clock class: 248
+  clock class range: 0..255
+
+        preset name: slaveonly
+         slave only: TRUE
+allow clock control: TRUE
+default clock class: 255 (only allowed value)
+
+        preset name: masterslave
+         slave only: FALSE
+allow clock control: TRUE
+default clock class: 248
+  clock class range: 128..254
+
+        preset name: masteronly
+         slave only: FALSE
+allow clock control: FALSE
+default clock class: 13
+  clock class range: 0..127
+
+
+=============================================================
+
+Possible internal states:
+  init:        INITIALIZING
+  flt:         FAULTY
+  lstn_init:   LISTENING (first time)
+  lstn_reset:  LISTENING (non first time)
+  pass:        PASSIVE Master (not best in BMC, not announcing)
+  uncl:        UNCALIBRATED
+  slv:         SLAVE
+  pmst:        PRE Master
+  mst:         ACTIVE Master
+  dsbl:        DISABLED
+  ?:           UNKNOWN state
+
+Handled signals:
+  SIGHUP         Reload configuration file and close / re-open log files
+  SIGUSR1        Manually step clock to current OFM value
+                 (overides clock:no_reset, but honors clock:no_adjust)
+  SIGUSR2	  Dump all PTP protocol counters to current log target
+                 (and clear if ptpengine:sigusr2_clears_counters set)
+
+  SIGINT|SIGTERM Close open files, remove lock file and exit cleanly
+  SIGKILL        Force an unclean exit
+
+BMC Algorithm defaults:
+  Software:   P1(128) > Class(13|248) > Accuracy("unk"/0xFE)   > Variance(65536) > P2(128)
