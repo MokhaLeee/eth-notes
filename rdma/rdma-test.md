@@ -36,3 +36,36 @@ sudo ./rdma_demo client -a 10.116.89.94 -m "Hello RDMA!"
 
 [demo.pcap](rdma-test.assets/demo.pcap)
 ![alt text](rdma-test.assets/image.png)
+
+## rdma_create_id
+
+`rdma_create_id` 是 RDMA CM（Connection Manager）里分配一个通信标识符的入口，可以把它类比成 TCP 里 `socket()` 的第一步。对应 rdma-core 内部的流程:
+
+```c
+static int rdma_create_id2(...)
+{
+    id_priv = ucma_alloc_id(channel, context, ps, qp_type);
+    if (!id_priv)
+        return ERR(ENOMEM);
+
+    CMA_INIT_CMD_RESP(&cmd, sizeof cmd, CREATE_ID, &resp, sizeof resp);
+    cmd.uid = (uintptr_t) id_priv;
+    cmd.ps = ps;
+    cmd.qp_type = qp_type;
+
+    ret = write(id_priv->id.channel->fd, &cmd, sizeof cmd);
+    if (ret != sizeof(cmd)) {
+        ret = (ret >= 0) ? ERR(ENODATA) : -1;
+        goto err;
+    }
+
+    VALGRIND_MAKE_MEM_DEFINED(&resp, sizeof resp);
+
+    id_priv->handle = resp.id;
+    ucma_insert_id(id_priv);
+    *id = &id_priv->id;
+    return 0;
+}
+```
+其内部对应一个 id_priv 通过 write fd 的方法注册进入内核的 ucma, 暴露出 id 给用户态用于后续的操作.
+
